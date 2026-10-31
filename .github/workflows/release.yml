@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build CLI and daemon
+        run: cargo build --release -p rofarm-daemon
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/rofarm.exe dist/
+          Copy-Item target/release/rofarmd.exe dist/
+          Copy-Item README.md, LICENSE, CHANGELOG.md dist/
+          Compress-Archive -Path dist/* -DestinationPath "rofarm-${{ github.ref_name }}-windows-x64.zip"
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rofarm-${{ github.ref_name }}-windows-x64.zip
+          generate_release_notes: true
+          draft: true
