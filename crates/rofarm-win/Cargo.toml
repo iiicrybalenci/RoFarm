@@ -1,0 +1,36 @@
+[package]
+name = "rofarm-win"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Windows platform layer for RoFarm: processes, jobs, windows, power and input"
+
+[dependencies]
+rofarm-core = { workspace = true }
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Gdi",
+  "Win32_Security",
+  "Win32_System_DataExchange",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_JobObjects",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Memory",
+  "Win32_System_Power",
+  "Win32_System_ProcessStatus",
+  "Win32_System_StationsAndDesktops",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }

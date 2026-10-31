@@ -1,0 +1,11 @@
+/target/
+/ui/node_modules/
+/ui/dist/
+/ui/test-results/
+/ui/playwright-report/
+/ui/.vite/
+.cloud-attachments/
+.freebuff/
+*.log
+.DS_Store
+Thumbs.db

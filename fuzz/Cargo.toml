@@ -1,0 +1,25 @@
+[package]
+name = "rofarm-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+rofarm-vault = { path = "../crates/rofarm-vault" }
+rofarm-core = { path = "../crates/rofarm-core" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "vault_header"
+path = "src/vault_header.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "import_parser"
+path = "src/import_parser.rs"
+test = false
+doc = false

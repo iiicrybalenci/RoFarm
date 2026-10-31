@@ -1,0 +1,16 @@
+[package]
+name = "rofarm-automation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Visual automation rule engine, scheduler helpers and sandboxed scripts for RoFarm"
+
+[dependencies]
+rofarm-core = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+rhai = { version = "1.19", features = ["sync", "serde"] }

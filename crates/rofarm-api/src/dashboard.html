@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RoFarm Remote</title>
+<style>
+  :root { color-scheme: dark; --bg:#0d1017; --panel:#151a24; --line:#232b3a; --text:#e8ecf5; --muted:#93a0b7; --accent:#6c8cff; --danger:#ff5d6c; --ok:#4fd18b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; background: radial-gradient(1200px 600px at 20% -10%, #1b2540, var(--bg)); color:var(--text); min-height:100vh; }
+  header { display:flex; align-items:center; gap:12px; padding:18px 24px; border-bottom:1px solid var(--line); }
+  .logo { width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,var(--accent),#b07cff); display:grid; place-items:center; font-weight:700; }
+  h1 { font-size:16px; margin:0; letter-spacing:.3px; }
+  .muted { color:var(--muted); }
+  main { max-width:1080px; margin:0 auto; padding:24px; display:grid; gap:18px; }
+  .card { background:color-mix(in srgb, var(--panel) 88%, transparent); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  input, button { font:inherit; border-radius:10px; border:1px solid var(--line); background:#10151f; color:var(--text); padding:10px 12px; }
+  button { cursor:pointer; background:var(--accent); border-color:transparent; color:#0b1020; font-weight:600; }
+  button.secondary { background:#1c2433; color:var(--text); border-color:var(--line); }
+  button.danger { background:var(--danger); color:#1a0206; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .stat { background:#10151f; border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .stat b { display:block; font-size:24px; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.5px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; background:#1c2433; font-size:12px; }
+  .pill.in_game { color:var(--ok); }
+  .pill.failed { color:var(--danger); }
+  .hidden { display:none; }
+  #toast { position:fixed; right:18px; bottom:18px; max-width:360px; padding:12px 14px; border-radius:12px; background:#1c2433; border:1px solid var(--line); opacity:0; transform:translateY(8px); transition:opacity .15s, transform .15s; }
+  #toast.show { opacity:1; transform:none; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+<header><div class="logo">R</div><h1>RoFarm Remote</h1><span class="muted" id="conn">not paired</span></header>
+<main>
+  <section class="card" id="loginCard">
+    <h2 style="font-size:15px;margin:0 0 8px">Pair this device</h2>
+    <p class="muted" style="margin-top:0">Open Settings → Remote in RoFarm to create a PIN. This dashboard is opt-in and stays on your network.</p>
+    <div class="row">
+      <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit PIN" aria-label="PIN" />
+      <input id="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="Authenticator code (if enabled)" aria-label="Authenticator code" />
+      <input id="device" placeholder="Device name" aria-label="Device name" />
+      <button id="pair">Pair</button>
+    </div>
+  </section>
+  <section id="app" class="hidden">
+    <div class="stats" id="stats"></div>
+    <div class="card" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="font-size:15px;margin:0">Clients</h2>
+        <div class="row"><button class="secondary" id="refresh">Refresh</button><button class="danger" id="killAll">Kill all</button></div>
+      </div>
+      <table><thead><tr><th>Account</th><th>State</th><th>CPU</th><th>Memory</th><th>PID</th><th></th></tr></thead><tbody id="clients"></tbody></table>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2 style="font-size:15px;margin:0 0 8px">Launch</h2>
+      <div class="row">
+        <input id="target" placeholder="Game link, place ID, @friend" style="min-width:280px;flex:1" aria-label="Launch target" />
+        <input id="accountIds" placeholder="Account IDs (comma separated)" style="min-width:240px;flex:1" aria-label="Account IDs" />
+        <button id="launch">Launch</button>
+      </div>
+      <p class="muted" style="margin-bottom:0">Accounts must be unlocked in the desktop vault. RoFarm never stores cookies in the browser.</p>
+    </div>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+(() => {
+  const tokenKey = "rofarm.remote.token";
+  const $ = (id) => document.getElementById(id);
+  let token = localStorage.getItem(tokenKey) || "";
+  let timer = null;
+  const toast = (message) => {
+    const el = $("toast");
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove("show"), 3600);
+  };
+  const api = async (path, options = {}) => {
+    const headers = { "content-type": "application/json", ...(options.headers || {}) };
+    if (token) headers.authorization = "Bearer " + token;
+    const res = await fetch(path, { ...options, headers });
+    if (res.status === 401) { setPaired(false); throw new Error("Device token was revoked or expired."); }
+    if (!res.ok) {
+      let message = res.statusText;
+      try { const body = await res.json(); message = body.message || message; } catch {}
+      throw new Error(message);
+    }
+    return res.json();
+  };
+  const setPaired = (paired) => {
+    $("loginCard").classList.toggle("hidden", paired);
+    $("app").classList.toggle("hidden", !paired);
+    $("conn").textContent = paired ? "paired" : "not paired";
+    if (!paired) { token = ""; localStorage.removeItem(tokenKey); if (timer) clearInterval(timer); }
+  };
+  const render = (snapshot) => {
+    const t = snapshot.totals || {};
+    $("stats").innerHTML = [
+      ["Accounts", snapshot.fleet.accounts.length],
+      ["Running", t.running],
+      ["CPU", (t.cpu_pct || 0).toFixed(1) + "%"],
+      ["Memory", (t.mem_mb || 0) + " MB"],
+      ["Vault", snapshot.vault.unlocked ? "unlocked" : "locked"],
+      ["Crashes", t.crashes || 0],
+    ].map(([label, value]) => `<div class="stat"><span class="muted">${label}</span><b>${value}</b></div>`).join("");
+    const accounts = new Map(snapshot.fleet.accounts.map(a => [a.id, a]));
+    $("clients").innerHTML = snapshot.live.map(c => {
+      const account = accounts.get(c.account_id);
+      const name = account ? ("@" + account.username) : c.account_id.slice(0, 8);
+      const pill = String(c.state).replaceAll("_", " ");
+      return `<tr><td>${name}</td><td><span class="pill ${c.state}">${pill}</span></td><td>${(c.cpu_pct || 0).toFixed(1)}%</td><td>${c.mem_mb || 0} MB</td><td>${c.pid || "—"}</td><td><button class="secondary" data-kill="${c.client_id}">Kill</button></td></tr>`;
+    }).join("") || `<tr><td colspan="6" class="muted">No clients running.</td></tr>`;
+  };
+  const refresh = async () => {
+    try { render(await api("/api/v1/status")); }
+    catch (error) { toast(error.message); }
+  };
+  $("pair").addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/v1/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin: $("pin").value, totp: $("totp").value || null, device_name: $("device").value || "Browser" }) });
+      if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.message || "Pairing failed"); }
+      const body = await res.json();
+      token = body.token; localStorage.setItem(tokenKey, token); $("pin").value = ""; $("totp").value = "";
+      setPaired(true); await refresh(); timer = setInterval(refresh, 3000);
+      toast("Paired. Keep this device on your trusted network.");
+    } catch (error) { toast(error.message); }
+  });
+  $("refresh").addEventListener("click", refresh);
+  $("killAll").addEventListener("click", async () => {
+    if (!confirm("Kill every Roblox client in this fleet?")) return;
+    try { const r = await api("/api/v1/kill", { method: "POST", body: JSON.stringify({ all: true }) }); toast("Killed " + r.killed); await refresh(); }
+    catch (error) { toast(error.message); }
+  });
+  $("launch").addEventListener("click", async () => {
+    try {
+      const ids = $("accountIds").value.split(",").map(s => s.trim()).filter(Boolean);
+      await api("/api/v1/launch", { method: "POST", body: JSON.stringify({ accounts: ids, target: $("target").value }) });
+      toast("Launch requested."); await refresh();
+    } catch (error) { toast(error.message); }
+  });
+  $("clients").addEventListener("click", async (event) => {
+    const id = event.target?.dataset?.kill;
+    if (!id) return;
+    try { await api("/api/v1/kill", { method: "POST", body: JSON.stringify({ client_id: id }) }); toast("Client stopped."); await refresh(); }
+    catch (error) { toast(error.message); }
+  });
+  if (token) { setPaired(true); refresh().then(() => timer = setInterval(refresh, 3000)).catch(() => setPaired(false)); }
+})();
+</script>
+</body>
+</html>

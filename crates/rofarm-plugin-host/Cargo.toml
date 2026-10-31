@@ -1,0 +1,27 @@
+[package]
+name = "rofarm-plugin-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Sandboxed WASM plugin host for RoFarm"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+wasmi = "0.36"
+sha2 = { workspace = true }
+hex = { workspace = true }
+url = { workspace = true }
+ureq = { version = "2.10", features = ["tls"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+wat = "1"
+rand = { workspace = true }

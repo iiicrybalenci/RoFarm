@@ -1,0 +1,25 @@
+[package]
+name = "rofarm-roblox"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Typed Roblox web API client with a strict network allow-list"
+
+[dependencies]
+rofarm-core = { workspace = true }
+async-trait = "0.1"
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "http2", "charset"] }
+secrecy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tempfile = { workspace = true }
